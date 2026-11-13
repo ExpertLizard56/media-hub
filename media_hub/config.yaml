@@ -1,0 +1,41 @@
+name: Media Hub
+version: "0.18.0"
+slug: media_hub
+url: https://github.com/ExpertLizard56/media-hub
+description: Updates and logs for the TV and Music apps, antenna channels, and a music library.
+arch:
+  - aarch64
+  - amd64
+startup: application
+boot: auto
+init: false
+# With the watchdog on, Home Assistant restarts the hub if it stops answering here, not only if it exits.
+watchdog: http://[HOST]:8765/health
+# On the home network: finding the HDHomeRun is a broadcast, which has to reach the LAN.
+# The hub serves the apps on port 8765.
+host_network: true
+# Its own page in Home Assistant (admin.go): connecting a device, the devices' logs, the hub's logs by section.
+ingress: true
+ingress_port: 8765
+ingress_entry: admin/
+panel_icon: mdi:server-network
+panel_title: Media Hub
+map:
+  - share:rw
+# To send a notification when the home's internet address changes (publicip.go): needs Home Assistant's mobile app.
+homeassistant_api: true
+# hdhomerun: the HDHomeRun's address on the home network (an IP or a name); empty finds it automatically.
+# torbox_api_key: TorBox, Settings, API (downloads new music; musicfetch.go). Only for getting albums.
+# nzbgeek_api_key: NZBgeek, your profile, API key (searches Usenet for albums to get).
+# remote_address: the hub's address from the internet (name:port); apps learn it as they pair. Empty: home only.
+# The keys are typed in here; they never leave the hub (the apps never see them).
+options:
+  hdhomerun: ""
+  torbox_api_key: ""
+  nzbgeek_api_key: ""
+  remote_address: ""
+schema:
+  hdhomerun: str?
+  torbox_api_key: password?
+  nzbgeek_api_key: password?
+  remote_address: str?

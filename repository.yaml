@@ -1,0 +1,5 @@
+# Home Assistant reads this when the repository is added in the app store (Settings, Apps, Install
+# app, top-right menu, Repositories). The app itself is the folder holding config.yaml.
+name: Media Hub
+url: https://github.com/ExpertLizard56/media-hub
+maintainer: ExpertLizard56

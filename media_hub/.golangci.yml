@@ -1,0 +1,14 @@
+# The hub's code checker (golangci-lint 2). Run it as Linux code, for either of the two
+# architectures the add-on is built for: GOOS=linux GOARCH=arm64 (or amd64).
+# The pre-commit hook only reports issues in changed lines (--new-from-rev=HEAD). The 39 errcheck
+# findings that were there on Nov 1 were fixed the same day: a full run now says "0 issues", and a
+# new one is the commit's to fix (or to explain beside the line), not a list to keep.
+version: "2"
+linters:
+  settings:
+    errcheck:
+      exclude-functions:
+        - os.Remove
+        - os.RemoveAll
+    staticcheck:
+      checks: ["all", "-QF*", "-ST1000", "-ST1003", "-ST1016", "-ST1020", "-ST1021", "-ST1022"]
