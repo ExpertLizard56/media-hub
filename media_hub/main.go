@@ -13,6 +13,8 @@
 //     The hub's own log (the HDHomeRun, streams, guide) goes in diagnostics/hub/: see eventlog.go.
 //
 // From outside the home, only boxes with the hub key get in, over the hub's own TLS: access.go.
+// Optionally a second port serves the same hub over HTTPS with a certificate another add-on renews:
+// https.go (options https_port and https_domain).
 package main
 
 import (
@@ -107,7 +109,14 @@ func main() {
 		log.Fatalf("listen %s: %v", addr, err)
 	}
 	log.Printf("Media Hub listening on %s (HTTP and TLS)", addr)
-	server := &http.Server{Handler: logRequests(guard(access, opts.RemoteAddress, mux))}
+	// One handler for every way in, so the same access rules apply on the optional HTTPS port too.
+	handler := logRequests(guard(access, opts.RemoteAddress, mux))
+	server := &http.Server{Handler: handler}
+	if opts.HTTPSPort > 0 && opts.HTTPSDomain != "" {
+		go serveHTTPS(handler, opts.HTTPSPort, opts.HTTPSDomain)
+	} else if opts.HTTPSPort != 0 || opts.HTTPSDomain != "" {
+		log.Printf("https: an HTTPS listener needs both https_port and https_domain; one is missing, so only %s is served", addr)
+	}
 	log.Fatal(server.Serve(newSplitListener(listener, &tls.Config{Certificates: []tls.Certificate{cert}, MinVersion: tls.VersionTLS12})))
 }
 
@@ -286,6 +295,10 @@ type options struct {
 	// Where phone notices go (publicip.go): notify service names, comma-separated. Empty means every
 	// notify service whose name starts with mobile_app_.
 	Phones string `json:"phones"`
+	// An HTTPS listener beside port 8765 (https.go), with the certificate of /ssl/<HTTPSDomain>: both
+	// must be set, and port 0 means off.
+	HTTPSPort   int    `json:"https_port"`
+	HTTPSDomain string `json:"https_domain"`
 }
 
 func readOptions() options {

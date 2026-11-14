@@ -1,5 +1,5 @@
 name: Media Hub
-version: "0.19.0"
+version: "0.20.0"
 slug: media_hub
 url: https://github.com/ExpertLizard56/media-hub
 description: Updates and logs for the TV and Music apps, antenna channels, and a music library.
@@ -12,7 +12,8 @@ init: false
 # With the watchdog on, Home Assistant restarts the hub if it stops answering here, not only if it exits.
 watchdog: http://[HOST]:8765/health
 # On the home network: finding the HDHomeRun is a broadcast, which has to reach the LAN.
-# The hub serves the apps on port 8765.
+# The hub serves the apps on port 8765. Host networking also reaches https_port when it is set, so
+# there is no ports section to change for it.
 host_network: true
 # Its own page in Home Assistant (admin.go): connecting a device, the devices' logs, the hub's logs by section.
 ingress: true
@@ -22,6 +23,8 @@ panel_icon: mdi:server-network
 panel_title: Media Hub
 map:
   - share:rw
+  # The certificate of https_domain, kept renewed by another add-on (https.go).
+  - ssl:ro
 # To leave notices in Home Assistant's notifications and send them to phones (publicip.go): needs
 # Home Assistant's mobile app for the phones.
 homeassistant_api: true
@@ -33,6 +36,10 @@ homeassistant_api: true
 # mobile_app_phone. Empty: every notify service whose name starts with mobile_app_. Phones stay quiet
 # until the time in /share/phone-quiet-until.txt (share above), while Home Assistant's own notice
 # still appears.
+# https_port: a second port that serves the same hub over HTTPS with a certificate from another
+# add-on (0 = off). https_domain: that certificate's folder in /ssl, as
+# /ssl/<https_domain>/fullchain.pem and privkey.pem, read again when they are renewed. Both must be
+# set to turn it on; port 8765 keeps serving as before, with the same access rules.
 # The keys are typed in here; they never leave the hub (the apps never see them).
 options:
   hdhomerun: ""
@@ -40,9 +47,13 @@ options:
   nzbgeek_api_key: ""
   remote_address: ""
   phones: ""
+  https_port: 0
+  https_domain: ""
 schema:
   hdhomerun: str?
   torbox_api_key: password?
   nzbgeek_api_key: password?
   remote_address: str?
   phones: str?
+  https_port: int(0,65535)?
+  https_domain: str?

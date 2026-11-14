@@ -21,6 +21,7 @@ Contents: [Files and settings](#files-and-settings) · [Updates](#updates) · [D
 | --- | --- |
 | `main.go` | routes, updates (`/update/`, `/install`), diagnostics upload, the add-on's options |
 | `access.go` | who gets in: the home network, or the hub key over the hub's own TLS (Away from home) |
+| `https.go` | the optional HTTPS port (`https_port`, `https_domain`): the same handler with a certificate from `/ssl`, read again when it is renewed |
 | `eventlog.go`, `memory.go` | the hub's own log (`diagnostics/hub/`), its memory every 15 min |
 | `music.go`, `musictags.go`, `musicmobile.go`, `musicwave.go` | the music library |
 | `musicbrainz.go`, `musicmatch.go`, `musicfetch.go` | getting new music |
@@ -32,7 +33,9 @@ Settings are the add-on's options in Home Assistant (Settings, Add-ons, Media Hu
 address on the home network; empty = find it by broadcast), `remote_address` (the hub's address from
 the internet, handed to apps as they pair; empty = the hub is used at home only), `torbox_api_key` and
 `nzbgeek_api_key` (only for getting new music; they never leave the hub), `phones` (where phone
-notices go: notify service names, comma-separated; empty = every `mobile_app_*` service). Tests
+notices go: notify service names, comma-separated; empty = every `mobile_app_*` service),
+`https_port` and `https_domain` (an optional second port serving the same hub over HTTPS with the
+certificate in `/ssl/<https_domain>/`; both must be set, and 0 = off). Tests
 (`*_test.go`) run in the add-on's Docker build, so a failing test stops a deploy and the old version
 keeps running; the error is in the add-on's Log (Settings, Add-ons, Media Hub). `go test ./...` and
 `go vet ./...` also run in this folder with Go on the machine (`GOOS=linux`: the hub is Linux-only).

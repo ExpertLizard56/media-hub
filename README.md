@@ -60,6 +60,8 @@ add-on starts, so restart it after a change.
 | `hdhomerun` | The HDHomeRun's address on your network (an IP or a name). Empty finds it automatically with SiliconDust's discovery broadcast, which is what most people want. |
 | `remote_address` | The address apps should use when they're away from home, as `name:port` (the name your router's dynamic DNS keeps pointed at your internet address, with the port you forward to the hub). Empty means the hub is used at home only. |
 | `phones` | Where phone notices go (for example when your home's internet address changes): notify service names, comma-separated, such as `mobile_app_phone`. Empty notifies every phone the Home Assistant app has added. |
+| `https_port` | Optional. A second port that serves the same hub over HTTPS, for a certificate from a real certificate authority (for a reverse proxy, or a browser that needs a certificate it trusts). `0` turns it off. It needs `https_domain` as well. |
+| `https_domain` | Optional. The folder of the HTTPS certificate in Home Assistant's `/ssl`: the hub uses `/ssl/<https_domain>/fullchain.pem` and `privkey.pem`. Needed with `https_port`. A certificate another add-on renews is used within a minute, without restarting the hub. |
 | `torbox_api_key` | Optional. Your TorBox API key (TorBox, Settings, API), for getting albums: TorBox does the Usenet downloading. |
 | `nzbgeek_api_key` | Optional. Your NZBgeek API key (your profile there), which searches Usenet for the albums. |
 
@@ -76,6 +78,11 @@ until then. A missing file, bad text, or a time without a zone means phones aren
 - **Port 8765**, HTTP and TLS on the same port. At home nothing needs a key; from outside, an app pairs
   first and uses its own key over TLS with the hub's own certificate (made on first start, kept in
   `/share/media-hub/tls`). Only what a new device needs to get in is allowed over plain HTTP.
+- **An optional HTTPS port.** With `https_port` and `https_domain` set, the same hub is also served
+  over HTTPS on that port, using the certificate in `/ssl/<https_domain>/` (kept up to date by
+  whatever add-on renews it; a new certificate is used within a minute). Port 8765 keeps working as
+  before, and the same access rules apply on both. The add-on uses the host network, so the new port
+  needs nothing else in its configuration.
 - **`/share/media-hub/`** holds everything:
   `music/` (your audio files, the only part you put there), `updates/` (the app versions handed out),
   `diagnostics/` (each device's log and the hub's own), `music-mobile/` and `music-waves/` (made from
