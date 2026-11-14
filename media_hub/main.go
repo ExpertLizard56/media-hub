@@ -68,12 +68,8 @@ func main() {
 	mux.HandleFunc("GET /{$}", serveInstall)
 	mux.HandleFunc("POST /diagnostics", receiveDiagnostics)
 	mux.Handle("GET /diagnostics/", http.StripPrefix("/diagnostics/", http.FileServer(http.Dir(diagnosticsDir))))
-	mux.HandleFunc("GET /health", func(w http.ResponseWriter, _ *http.Request) {
-		if _, err := io.WriteString(w, "ok\n"); err != nil {
-			log.Printf("health: %v", err)
-		}
-	})
 	opts := readOptions()
+	mux.HandleFunc("GET /health", func(w http.ResponseWriter, r *http.Request) { serveHealth(w, r, opts.RemoteAddress) })
 	hubLog.event("hub_start", "version", version, "hdhomerun_option", opts.HDHomeRun)
 	ant := newAntenna(opts.HDHomeRun)
 	ant.routes(mux)
@@ -125,6 +121,23 @@ func main() {
 		log.Printf("https: an HTTPS listener needs both https_port and https_domain; one is missing, so only %s is served", addr)
 	}
 	log.Fatal(server.Serve(newSplitListener(listener, &tls.Config{Certificates: []tls.Certificate{cert}, MinVersion: tls.VersionTLS12})))
+}
+
+// serveHealth answers "ok", plus two headers the apps use to pick their route (app.hub.Hub):
+// X-Hub-Where (home or away: where this request came from, as guard sees it) and, to a request from
+// home only, X-Hub-Remote (the hub's internet address now), so paired apps follow a change of address.
+func serveHealth(w http.ResponseWriter, r *http.Request, remoteAddress string) {
+	if fromHome(r) {
+		w.Header().Set("X-Hub-Where", "home")
+		if remoteAddress != "" {
+			w.Header().Set("X-Hub-Remote", "https://"+strings.TrimPrefix(strings.TrimPrefix(remoteAddress, "https://"), "http://"))
+		}
+	} else {
+		w.Header().Set("X-Hub-Where", "away")
+	}
+	if _, err := io.WriteString(w, "ok\n"); err != nil {
+		log.Printf("health: %v", err)
+	}
 }
 
 // receiveDiagnostics appends a box's upload to that box's file for today.

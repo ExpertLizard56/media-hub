@@ -99,8 +99,14 @@ name pointed at the home's internet address.
   and `access.json` somewhere safe: to restore, copy them back into `/share/media-hub/` and restart the
   hub add-on. Home Assistant's automatic backups only include `share` if that folder is ticked in its
   backup settings.
-- The app tries the home address first and uses the internet one only if the hub doesn't answer
-  there (`hub_route` in the log). Antenna streams from home never use the upload.
+- Since Nov 14 the internet address is `https_port` with a real certificate
+  (`pi.hensleynetwork.freemyip.com:8766`; at home AdGuard points the name at the Pi), so the apps use
+  it at home too. `/health` tells them where they are: `X-Hub-Where: home|away`, and to home requests
+  `X-Hub-Remote` (the hub's internet address now), which a paired app saves, so a change of
+  `remote_address` reaches every device by itself. The app asks the internet address first and uses
+  it when it answers, away only when the hub says so (`hub_route` in the log; the Music app streams
+  the small copies away); if it doesn't answer, the saved home address (port 8765 on the home network).
+  Antenna streams from home never use the upload.
 - If the home's internet address changes, the router's dynamic DNS follows it, so devices need
   nothing. The hub still checks every 15 min, logs it and notifies: always a notification in Home
   Assistant itself, and the phones (`phones` option; every `mobile_app_*` service when empty) unless
