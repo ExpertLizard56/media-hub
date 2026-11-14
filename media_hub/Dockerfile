@@ -5,6 +5,7 @@ WORKDIR /src
 # Home Assistant passes the add-on's version (config.yaml); the hub logs it.
 ARG BUILD_VERSION=dev
 COPY go.mod *.go ./
+COPY catalogdata ./catalogdata
 # The tests run on every build, so a broken one never gets installed.
 RUN CGO_ENABLED=0 go test ./...
 RUN CGO_ENABLED=0 go build -trimpath -ldflags="-s -w -X main.version=${BUILD_VERSION}" -o /media-hub .

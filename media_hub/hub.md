@@ -27,6 +27,8 @@ Contents: [Files and settings](#files-and-settings) · [Updates](#updates) · [D
 | `musicbrainz.go`, `musicmatch.go`, `musicfetch.go` | getting new music |
 | `share.go`, `publicip.go` | handing a login between devices; the home's internet address |
 | `antenna.go`, `discover.go`, `monitor.go`, `tsstats.go` | the antenna relay (the TV app's) |
+| `catalog.go`, `catalogdata/seed.json` | the movie catalog (rows from TMDB, daily lineup); `/catalog/rows` (home only) shows today's rows |
+| `stremio.go` | a home-only Stremio add-on over the catalog, for testing it (`/stremio/manifest.json`) |
 
 Settings are the add-on's options in Home Assistant (Settings, Add-ons, Media Hub, Configuration;
 `/data/options.json`, read at start: restart the add-on after a change): `hdhomerun` (the tuner's
@@ -35,7 +37,8 @@ the internet, handed to apps as they pair; empty = the hub is used at home only)
 `nzbgeek_api_key` (only for getting new music; they never leave the hub), `phones` (where phone
 notices go: notify service names, comma-separated; empty = every `mobile_app_*` service),
 `https_port` and `https_domain` (an optional second port serving the same hub over HTTPS with the
-certificate in `/ssl/<https_domain>/`; both must be set, and 0 = off). Tests
+certificate in `/ssl/<https_domain>/`; both must be set, and 0 = off), `tmdb_api_key` (the movie
+catalog; empty = off). Tests
 (`*_test.go`) run in the add-on's Docker build, so a failing test stops a deploy and the old version
 keeps running; the error is in the add-on's Log (Settings, Add-ons, Media Hub). `go test ./...` and
 `go vet ./...` also run in this folder with Go on the machine (`GOOS=linux`: the hub is Linux-only).
@@ -211,3 +214,17 @@ The TV app's antenna channels come through the hub (`antenna.go`): `/antenna/lin
 shared by every device on the same channel, nothing transcoded) and `/antenna/status.json`. The
 HDHomeRun is found by broadcast (`discover.go`) unless the `hdhomerun` option names it; `monitor.go`
 and `tsstats.go` log its signal and lost packets (Diagnostics, above). The app's side is `tv/tv.md`.
+
+## The movie catalog
+
+`catalog.go`, on when `tmdb_api_key` is set. Once a day (on the first start, then after 4am) it pulls
+popular English movies per TMDB genre, the last 120 days' releases and the best-rated, plus details
+(IMDb id, runtime) of new movies and of any not refreshed in 60 days. Each movie gets tags: the hand
+sorting and holiday lists in `catalogdata/seed.json` (embedded), plus TMDB's genres. Files in
+`/share/media-hub/catalog/`: `movies.json`, `shown.json` (what each row showed first, for pushing
+those down for a week), `state.json`, and `corrections.json`, written by hand: `{"<tmdb id>":
+["Tag", ...]}` replaces that movie's tags, read again within a minute of a change. Rows: the holiday
+whose dates hold today (the shortest when two do), New Releases, then every tag with 8 or more movies.
+Each row's order is fixed for the day. The TV app will read the rows later; until then `stremio.go`
+serves them to Stremio on the home network only (guard turns away everything else without a hub key),
+at `https://<https_domain>:<https_port>/stremio/manifest.json`. It is never published.

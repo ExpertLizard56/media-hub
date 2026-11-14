@@ -1,5 +1,5 @@
 name: Media Hub
-version: "0.20.0"
+version: "0.21.0"
 slug: media_hub
 url: https://github.com/ExpertLizard56/media-hub
 description: Updates and logs for the TV and Music apps, antenna channels, and a music library.
@@ -40,6 +40,8 @@ homeassistant_api: true
 # add-on (0 = off). https_domain: that certificate's folder in /ssl, as
 # /ssl/<https_domain>/fullchain.pem and privkey.pem, read again when they are renewed. Both must be
 # set to turn it on; port 8765 keeps serving as before, with the same access rules.
+# tmdb_api_key: TMDB's API key (or read access token) for the movie catalog and its home-only Stremio
+# test add-on at /stremio/manifest.json (catalog.go, stremio.go). Empty: no catalog.
 # The keys are typed in here; they never leave the hub (the apps never see them).
 options:
   hdhomerun: ""
@@ -49,6 +51,7 @@ options:
   phones: ""
   https_port: 0
   https_domain: ""
+  tmdb_api_key: ""
 schema:
   hdhomerun: str?
   torbox_api_key: password?
@@ -57,3 +60,4 @@ schema:
   phones: str?
   https_port: int(0,65535)?
   https_domain: str?
+  tmdb_api_key: password?

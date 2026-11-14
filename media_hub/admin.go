@@ -44,6 +44,7 @@ var logSections = []logSection{
 		[]string{"music_fetch", "music_album", "music_lookup"}},
 	{"connections", "Connections", "Devices pairing, installing or refused from outside, blocked or removed, logins handed between devices.",
 		[]string{"remote_", "app_paired", "login_share_", "access_created", "certificate_created", "install_code_", "device_"}},
+	{"catalog", "Movie catalog", "The daily TMDB refresh, corrections read, catalog files.", []string{"catalog_"}},
 	{"hub", "Hub", "Starts, memory, the home's internet address, notifications.", nil},
 }
 
@@ -490,6 +491,7 @@ details > summary { list-style:none; cursor:pointer; } details > summary::-webki
 <div class="actions"><form method="post" action="new-code" onsubmit="return confirm('Make a new install code? Nobody can connect with the old one. Connected devices keep working.')"><button>New install code</button></form></div>
 <p class="dim">{{if .Remote}}Away from home, connected devices use {{.Remote}} by themselves.{{else}}No internet address set (Configuration, remote_address): devices work at home only.{{end}}
 Only give the code to people you'd let in.</p>
+{{if .Remote}}<p class="dim">Stremio test add-on (home network only, needs tmdb_api_key): https://{{.Remote}}/stremio/manifest.json</p>{{end}}
 </div>
 
 {{define "device"}}<div class="item">

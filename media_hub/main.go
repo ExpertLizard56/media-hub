@@ -103,6 +103,13 @@ func main() {
 		log.Fatalf("certificate: %v", err)
 	}
 	newAdminPage(access, opts.RemoteAddress).routes(mux)
+	// The movie catalog (catalog.go) and its home-only Stremio test add-on (stremio.go); off without a TMDB key.
+	cat := newCatalog(opts.TMDBKey, catalogDir)
+	cat.routes(mux)
+	stremioAddon{cat}.routes(mux)
+	if cat.on() {
+		go cat.keepFresh()
+	}
 	addr := ":" + envOr("PORT", "8765")
 	listener, err := net.Listen("tcp", addr)
 	if err != nil {
@@ -299,6 +306,9 @@ type options struct {
 	// must be set, and port 0 means off.
 	HTTPSPort   int    `json:"https_port"`
 	HTTPSDomain string `json:"https_domain"`
+	// TMDB's API key (a short v3 key or a long read access token) for the movie catalog (catalog.go);
+	// empty = no catalog.
+	TMDBKey string `json:"tmdb_api_key"`
 }
 
 func readOptions() options {

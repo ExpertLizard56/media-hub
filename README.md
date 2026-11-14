@@ -62,6 +62,7 @@ add-on starts, so restart it after a change.
 | `phones` | Where phone notices go (for example when your home's internet address changes): notify service names, comma-separated, such as `mobile_app_phone`. Empty notifies every phone the Home Assistant app has added. |
 | `https_port` | Optional. A second port that serves the same hub over HTTPS, for a certificate from a real certificate authority (for a reverse proxy, or a browser that needs a certificate it trusts). `0` turns it off. It needs `https_domain` as well. |
 | `https_domain` | Optional. The folder of the HTTPS certificate in Home Assistant's `/ssl`: the hub uses `/ssl/<https_domain>/fullchain.pem` and `privkey.pem`. Needed with `https_port`. A certificate another add-on renews is used within a minute, without restarting the hub. |
+| `tmdb_api_key` | Optional. A TMDB API key (or read access token) for the movie catalog: rows of movies refreshed daily, which a home-network-only Stremio add-on at `/stremio/manifest.json` shows for testing. Empty turns it off. |
 | `torbox_api_key` | Optional. Your TorBox API key (TorBox, Settings, API), for getting albums: TorBox does the Usenet downloading. |
 | `nzbgeek_api_key` | Optional. Your NZBgeek API key (your profile there), which searches Usenet for the albums. |
 
