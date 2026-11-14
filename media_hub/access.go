@@ -8,8 +8,8 @@ package main
 //     its fingerprint, pin.txt), so no certificate authority, domain or sign-up is involved.
 //   - From the home network (and VPNs into it) everything works as before, with no key.
 //   - From anywhere else: the app's requests come over TLS with the hub key (X-Hub-Key); the
-//     only plain-HTTP requests allowed are a new box's first install, /i/<install code>, since the
-//     Downloader app wouldn't trust the hub's own certificate, and an app pairing, /pair/<install code>, which
+//     only requests without the key are a new box's first install, /i/<install code> (plain HTTP or
+//     HTTPS: Downloader trusts the real certificate on https_port, not the hub's own), and an app pairing, /pair/<install code>, which
 //     hands it the key, the certificate's fingerprint and the internet address (servePair: the apps carry
 //     none of these built in any more, so anyone's hub can be used). Browsing diagnostics stays home-only.
 //
@@ -150,12 +150,12 @@ func guard(access *hubAccess, remoteAddress string, next http.Handler) http.Hand
 			next.ServeHTTP(w, r)
 			return
 		}
+		if r.Method == http.MethodGet && r.URL.Path == installPath {
+			hubLog.event("remote_install", "from", remoteHost(r))
+			serveInstall(w, r)
+			return
+		}
 		if r.TLS == nil {
-			if r.Method == http.MethodGet && r.URL.Path == installPath {
-				hubLog.event("remote_install", "from", remoteHost(r))
-				serveInstall(w, r)
-				return
-			}
 			http.NotFound(w, r)
 			return
 		}

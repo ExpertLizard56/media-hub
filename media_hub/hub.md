@@ -90,7 +90,7 @@ name pointed at the home's internet address.
 
 - The port speaks plain HTTP and TLS. From the home network (and VPNs into it) everything works as
   before. From anywhere else: TLS with the hub key (`X-Hub-Key`) for everything, except a new
-  device's first install over plain HTTP at `/i/<install code>`; browsing diagnostics stays home-only.
+  device's first install at `/i/<install code>` (plain HTTP, or HTTPS on https_port); browsing diagnostics stays home-only.
 - The TLS certificate is the hub's own (`/share/media-hub/tls`, 30 years); the app trusts it by its
   fingerprint alone. No domain, certificate authority or sign-up.
 - The key and install code are in `/share/media-hub/access.json`; each app keeps what it paired with
