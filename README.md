@@ -59,11 +59,17 @@ add-on starts, so restart it after a change.
 | --- | --- |
 | `hdhomerun` | The HDHomeRun's address on your network (an IP or a name). Empty finds it automatically with SiliconDust's discovery broadcast, which is what most people want. |
 | `remote_address` | The address apps should use when they're away from home, as `name:port` (the name your router's dynamic DNS keeps pointed at your internet address, with the port you forward to the hub). Empty means the hub is used at home only. |
+| `phones` | Where phone notices go (for example when your home's internet address changes): notify service names, comma-separated, such as `mobile_app_phone`. Empty notifies every phone the Home Assistant app has added. |
 | `torbox_api_key` | Optional. Your TorBox API key (TorBox, Settings, API), for getting albums: TorBox does the Usenet downloading. |
 | `nzbgeek_api_key` | Optional. Your NZBgeek API key (your profile there), which searches Usenet for the albums. |
 
 Both keys are needed for album fetching, and both stay on the hub: the apps never see them, and they're
 taken out of anything logged or shown.
+
+Phone notices are also left in Home Assistant's own notifications. To stop the phone alerts for a
+while, put the time to start again in `/share/phone-quiet-until.txt` as an ISO time with its zone
+(`2026-11-16T12:00:00-05:00`): Home Assistant's notification still appears, but no phone is notified
+until then. A missing file, bad text, or a time without a zone means phones aren't quiet.
 
 ## The port, and where the files go
 

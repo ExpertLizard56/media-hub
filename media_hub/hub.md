@@ -31,10 +31,11 @@ Settings are the add-on's options in Home Assistant (Settings, Add-ons, Media Hu
 `/data/options.json`, read at start: restart the add-on after a change): `hdhomerun` (the tuner's
 address on the home network; empty = find it by broadcast), `remote_address` (the hub's address from
 the internet, handed to apps as they pair; empty = the hub is used at home only), `torbox_api_key` and
-`nzbgeek_api_key` (only for getting new music; they never leave the hub). Tests (`*_test.go`) run in
-the add-on's Docker build, so a failing test stops a deploy and the old version keeps running; the
-error is in the add-on's Log (Settings, Add-ons, Media Hub). `go test ./...` and `go vet ./...` also
-run in this folder with Go on the machine (`GOOS=linux`: the hub is Linux-only).
+`nzbgeek_api_key` (only for getting new music; they never leave the hub), `phones` (where phone
+notices go: notify service names, comma-separated; empty = every `mobile_app_*` service). Tests
+(`*_test.go`) run in the add-on's Docker build, so a failing test stops a deploy and the old version
+keeps running; the error is in the add-on's Log (Settings, Add-ons, Media Hub). `go test ./...` and
+`go vet ./...` also run in this folder with Go on the machine (`GOOS=linux`: the hub is Linux-only).
 
 `scripts/deploy-hub.sh` copies `hub/` to the Home Assistant machine over SSH and has Home Assistant
 build and restart it; bump `version` in `hub/config.yaml` for each change.
@@ -95,9 +96,11 @@ name pointed at the home's internet address.
 - The app tries the home address first and uses the internet one only if the hub doesn't answer
   there (`hub_route` in the log). Antenna streams from home never use the upload.
 - If the home's internet address changes, the router's dynamic DNS follows it, so devices need
-  nothing. The hub still checks every 15 min, logs it and notifies through Home Assistant
-  (`publicip.go`, `public_address` in the hub log). The app pins the hub's certificate, not a name or
-  address, so the name can point anywhere without a rebuild.
+  nothing. The hub still checks every 15 min, logs it and notifies: always a notification in Home
+  Assistant itself, and the phones (`phones` option; every `mobile_app_*` service when empty) unless
+  `/share/phone-quiet-until.txt` holds a time still to come (`publicip.go`, `public_address` in the
+  hub log). The app pins the hub's certificate, not a name or address, so the name can point anywhere
+  without a rebuild.
 - A remote device's first install: `<remote address>/i/<install code>` in Downloader.
 - An app pairing: `/pair/<install code>` (plain HTTP or TLS, home or away) answers
   `{"key", "pin", "remoteUrl"}`, so the apps carry no hub built in (shared `HubSettings`). `remoteUrl`

@@ -3,7 +3,8 @@ package main
 // The home's address on the internet. Devices away from home reach the hub by name, with the
 // router's dynamic DNS keeping that name pointed at the address, so a change only matters if
 // the name fails to follow it. The hub checks every quarter of an hour, logs it, and notifies
-// through Home Assistant (its mobile app's notifications) when it changes.
+// when it changes: a notification in Home Assistant itself always, and the phones unless they
+// are quiet (the phones option and /share/phone-quiet-until.txt, below).
 
 import (
 	"bytes"
@@ -20,12 +21,18 @@ import (
 
 const publicAddressEvery = 15 * time.Minute
 
-var publicAddressFile = filepath.Join(root, "public-address.txt")
+var (
+	publicAddressFile = filepath.Join(root, "public-address.txt")
+	// The household's quiet time for phone notices: one ISO time with its zone, e.g.
+	// 2026-11-16T12:00:00-05:00. It lives in /share, outside the hub's own folder, so it can be set
+	// by hand; share is mapped in config.yaml. Missing or unreadable means phones aren't quiet.
+	phoneQuietFile = filepath.Join("/share", "phone-quiet-until.txt")
+)
 
 // Services that answer with the address a request came from; no account needed.
 var addressServices = []string{"https://api.ipify.org", "https://icanhazip.com"}
 
-func watchPublicAddress() {
+func watchPublicAddress(phones string) {
 	last := ""
 	if data, err := os.ReadFile(publicAddressFile); err == nil {
 		last = strings.TrimSpace(string(data))
@@ -35,7 +42,8 @@ func watchPublicAddress() {
 			hubLog.event("public_address", "address", address, "was", last)
 			if last != "" {
 				notifyPhone("Home internet address changed",
-					fmt.Sprintf("It's now %s (was %s). The router's dynamic DNS should point the hub's name at it within 5 minutes; if devices away from home can't connect after that, check the router's dynamic DNS.", address, last))
+					fmt.Sprintf("It's now %s (was %s). The router's dynamic DNS should point the hub's name at it within 5 minutes; if devices away from home can't connect after that, check the router's dynamic DNS.", address, last),
+					phones)
 			}
 			if err := os.WriteFile(publicAddressFile, []byte(address+"\n"), 0o644); err != nil {
 				hubLog.event("public_address_save_failed", "error", err)
@@ -61,9 +69,11 @@ func lookUpPublicAddress() string {
 	return ""
 }
 
-// notifyPhone sends a notification to every phone with the Home Assistant app, and leaves one in
-// Home Assistant itself. Needs homeassistant_api in config.yaml.
-func notifyPhone(title, message string) {
+// notifyPhone leaves a notification in Home Assistant itself, then sends it to the phones: the
+// add-on's phones option if it names any (notify services, comma-separated), otherwise every notify
+// service whose name starts with mobile_app_. Phones are skipped while phoneQuietFile says it's
+// quiet. A failure is logged, never fatal. Needs homeassistant_api in config.yaml.
+func notifyPhone(title, message, phones string) {
 	token := os.Getenv("SUPERVISOR_TOKEN")
 	if token == "" {
 		hubLog.event("notify_failed", "error", "no Home Assistant access")
@@ -89,37 +99,84 @@ func notifyPhone(title, message string) {
 		}
 		return data, nil
 	}
-	note := map[string]string{"title": title, "message": message}
-	if _, err := call(http.MethodPost, "/services/persistent_notification/create", note); err != nil {
+	if _, err := call(http.MethodPost, "/services/persistent_notification/create",
+		map[string]string{"title": title, "message": message}); err != nil {
 		hubLog.event("notify_failed", "error", err)
+	}
+	if until, quiet := phonesQuiet(time.Now()); quiet {
+		hubLog.event("notify_quiet", "title", title, "until", until.Format(time.RFC3339))
+		return
+	}
+	services, err := phoneNotifyServices(phones, call)
+	if err != nil {
+		hubLog.event("notify_failed", "error", err) // no services to notify this time
+		return
+	}
+	note := map[string]any{
+		"title":   title,
+		"message": message,
+		// The app's notification options go in data; none are needed for these notices.
+		"data": map[string]any{},
+	}
+	sent := 0
+	for _, service := range services {
+		if _, err := call(http.MethodPost, "/services/notify/"+service, note); err != nil {
+			hubLog.event("notify_failed", "service", service, "error", err)
+		} else {
+			sent++
+		}
+	}
+	hubLog.event("notified", "title", title, "phones", sent)
+}
+
+// phonesQuiet reports the time phones stay quiet until, read from phoneQuietFile: one ISO time with
+// its zone. A missing file, bad text or a time without a zone means phones aren't quiet.
+func phonesQuiet(now time.Time) (time.Time, bool) {
+	data, err := os.ReadFile(phoneQuietFile)
+	if err != nil {
+		return time.Time{}, false
+	}
+	until, err := time.Parse(time.RFC3339, strings.TrimSpace(string(data)))
+	if err != nil || !until.After(now) {
+		return time.Time{}, false
+	}
+	return until, true
+}
+
+// phoneNotifyServices is where phone notices go: the phones option's service names, or, when it is
+// blank, every notify service whose name starts with mobile_app_ that Home Assistant lists.
+func phoneNotifyServices(phones string, call func(method, path string, body any) ([]byte, error)) ([]string, error) {
+	var services []string
+	for _, name := range strings.Split(phones, ",") {
+		name = strings.TrimSpace(name)
+		name = strings.TrimPrefix(name, "notify.")
+		if name = strings.TrimSpace(name); name != "" {
+			services = append(services, name)
+		}
+	}
+	if len(services) > 0 {
+		return services, nil
 	}
 	data, err := call(http.MethodGet, "/services", nil)
 	if err != nil {
-		hubLog.event("notify_failed", "error", err)
-		return
+		return nil, err
 	}
 	var domains []struct {
 		Domain   string                     `json:"domain"`
 		Services map[string]json.RawMessage `json:"services"`
 	}
 	if err := json.Unmarshal(data, &domains); err != nil {
-		hubLog.event("notify_failed", "error", err) // no services to notify this time
+		return nil, err
 	}
-	sent := 0
 	for _, d := range domains {
 		if d.Domain != "notify" {
 			continue
 		}
 		for service := range d.Services {
-			if !strings.HasPrefix(service, "mobile_app_") {
-				continue
-			}
-			if _, err := call(http.MethodPost, "/services/notify/"+service, note); err != nil {
-				hubLog.event("notify_failed", "service", service, "error", err)
-			} else {
-				sent++
+			if strings.HasPrefix(service, "mobile_app_") {
+				services = append(services, service)
 			}
 		}
 	}
-	hubLog.event("notified", "title", title, "phones", sent)
+	return services, nil
 }

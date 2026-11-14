@@ -82,7 +82,7 @@ func main() {
 	go ant.monitor()
 
 	go pruneDaily()
-	go watchPublicAddress()
+	go watchPublicAddress(opts.Phones)
 	go logMemoryForever()
 
 	secrets, err := loadAccess()
@@ -283,6 +283,9 @@ type options struct {
 	// The hub's address from the internet (name:port, the router forwarding that port here), handed to an app as it
 	// pairs (access.go); empty when the hub is only used at home.
 	RemoteAddress string `json:"remote_address"`
+	// Where phone notices go (publicip.go): notify service names, comma-separated. Empty means every
+	// notify service whose name starts with mobile_app_.
+	Phones string `json:"phones"`
 }
 
 func readOptions() options {

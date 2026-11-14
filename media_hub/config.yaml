@@ -1,5 +1,5 @@
 name: Media Hub
-version: "0.18.0"
+version: "0.19.0"
 slug: media_hub
 url: https://github.com/ExpertLizard56/media-hub
 description: Updates and logs for the TV and Music apps, antenna channels, and a music library.
@@ -22,20 +22,27 @@ panel_icon: mdi:server-network
 panel_title: Media Hub
 map:
   - share:rw
-# To send a notification when the home's internet address changes (publicip.go): needs Home Assistant's mobile app.
+# To leave notices in Home Assistant's notifications and send them to phones (publicip.go): needs
+# Home Assistant's mobile app for the phones.
 homeassistant_api: true
 # hdhomerun: the HDHomeRun's address on the home network (an IP or a name); empty finds it automatically.
 # torbox_api_key: TorBox, Settings, API (downloads new music; musicfetch.go). Only for getting albums.
 # nzbgeek_api_key: NZBgeek, your profile, API key (searches Usenet for albums to get).
 # remote_address: the hub's address from the internet (name:port); apps learn it as they pair. Empty: home only.
+# phones: where phone notices go (publicip.go): notify service names, comma-separated, such as
+# mobile_app_phone. Empty: every notify service whose name starts with mobile_app_. Phones stay quiet
+# until the time in /share/phone-quiet-until.txt (share above), while Home Assistant's own notice
+# still appears.
 # The keys are typed in here; they never leave the hub (the apps never see them).
 options:
   hdhomerun: ""
   torbox_api_key: ""
   nzbgeek_api_key: ""
   remote_address: ""
+  phones: ""
 schema:
   hdhomerun: str?
   torbox_api_key: password?
   nzbgeek_api_key: password?
   remote_address: str?
+  phones: str?
