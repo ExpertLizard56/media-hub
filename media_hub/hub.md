@@ -83,6 +83,8 @@ build and restart it; bump `version` in `hub/config.yaml` for each change.
 
 ## Away from home
 
+Pairing at home without the code: while /share/media-hub/pair-home-until.txt holds a time to come (RFC 3339), an app on the home network with no key yet asks /pair/home at start and is paired as if it had the install code (access.go). Write the file, open each app once, delete it; devices paired meanwhile stay paired.
+
 (`hub/access.go`, `shared/hubclient/.../app/hub/Hub.kt`). Devices at other houses reach the hub through
 one port forwarded on the home router to the hub's port, by name: the router's dynamic DNS keeps that
 name pointed at the home's internet address.

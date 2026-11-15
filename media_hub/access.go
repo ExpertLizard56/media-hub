@@ -13,6 +13,11 @@ package main
 //     hands it the key, the certificate's fingerprint and the internet address (servePair: the apps carry
 //     none of these built in any more, so anyone's hub can be used). Browsing diagnostics stays home-only.
 //
+// Pairing at home without the code: while /share/media-hub/pair-home-until.txt holds a time still to come
+// (RFC 3339), an app on the home network that asks /pair/home is paired as if it had the install code,
+// so devices can be readied for travel without typing it. Off once that time passes or the file is gone;
+// devices paired meanwhile stay paired. Asked from anywhere else, or while closed, it's a plain 404.
+//
 // The key and install code are made once, at random, and kept in /share/media-hub/access.json.
 
 import (
@@ -146,6 +151,14 @@ func guard(access *hubAccess, remoteAddress string, next http.Handler) http.Hand
 			servePair(w, r, access, remoteAddress)
 			return
 		}
+		if r.Method == http.MethodGet && r.URL.Path == "/pair/home" {
+			if fromHome(r) && homePairingOpen(time.Now()) {
+				servePair(w, r, access, remoteAddress)
+			} else {
+				http.NotFound(w, r)
+			}
+			return
+		}
 		if fromHome(r) || r.URL.Path == "/health" {
 			next.ServeHTTP(w, r)
 			return
@@ -205,6 +218,18 @@ func servePair(w http.ResponseWriter, r *http.Request, access *hubAccess, remote
 	if err := json.NewEncoder(w).Encode(p); err != nil {
 		log.Printf("pair: %v", err)
 	}
+}
+
+// pairHomeFile: while it holds a time to come, home devices pair without the install code (/pair/home).
+var pairHomeFile = filepath.Join(root, "pair-home-until.txt")
+
+func homePairingOpen(now time.Time) bool {
+	data, err := os.ReadFile(pairHomeFile)
+	if err != nil {
+		return false
+	}
+	until, err := time.Parse(time.RFC3339, strings.TrimSpace(string(data)))
+	return err == nil && now.Before(until)
 }
 
 // fromHome: the home network, this machine, or a VPN into the home (Tailscale, WireGuard).
