@@ -19,6 +19,8 @@ package main
 //   {"id": "tt.../tmdb:<id>", "streams": n, "error": ..., "checked": ...}). A movie it checked that came
 //   back with no streams and no error is left out of every row until a later check finds some. Movies
 //   not in it, or with an error, stay. Read again when it changes, like corrections.json.
+// - IMDb ratings and Wikidata facts (Oscars, based on a book or a true story, film series) come from
+//   catalogsources.go, once a day after the refresh.
 
 import (
 	"bytes"
@@ -85,6 +87,16 @@ type catalogMovie struct {
 	GenreIDs   []int     `json:"genreIds,omitempty"`
 	Added      time.Time `json:"added"`
 	Detailed   time.Time `json:"detailed,omitempty"`
+	// From catalogsources.go.
+	IMDbRating      float64   `json:"imdbRating,omitempty"`
+	IMDbVotes       int       `json:"imdbVotes,omitempty"`
+	Wikidata        string    `json:"wikidata,omitempty"` // Q id
+	OscarWins       int       `json:"oscarWins,omitempty"`
+	OscarNoms       int       `json:"oscarNoms,omitempty"`
+	BasedOnBook     bool      `json:"basedOnBook,omitempty"`
+	TrueStory       bool      `json:"trueStory,omitempty"`
+	Series          string    `json:"series,omitempty"`
+	WikidataChecked time.Time `json:"wikidataChecked,omitempty"`
 	// Tags as served: worked out from the seed, TMDB's genres and the corrections (tagsFor).
 	Tags []string `json:"-"`
 }
@@ -128,6 +140,10 @@ type catalog struct {
 	dir     string
 	key     string
 	tmdb    string // TMDB's API address; a test points it at its own server
+	// catalogsources.go's addresses (a test points them at its own server) and pause between queries.
+	imdbRatings   string
+	wikidata      string
+	wikidataPause time.Duration
 	client  *http.Client
 	seed    catalogSeed
 	now     func() time.Time
@@ -146,12 +162,15 @@ type catalog struct {
 	lineupDay   string
 	lineups     map[string][]int // row id -> the day's order
 	lastRefresh time.Time
+	lastSources time.Time
 }
 
 func newCatalog(key, dir string) *catalog {
 	c := &catalog{
 		dir: dir, key: strings.TrimSpace(key), tmdb: "https://api.themoviedb.org/3",
 		client: &http.Client{Timeout: 30 * time.Second}, now: time.Now, pause: 30 * time.Millisecond,
+		imdbRatings: "https://datasets.imdbws.com/title.ratings.tsv.gz", wikidata: "https://query.wikidata.org/sparql",
+		wikidataPause: catalogWikidataPause,
 		movies: map[int]*catalogMovie{}, corrections: map[int][]string{}, shown: map[string]map[int]string{},
 	}
 	if err := json.Unmarshal(catalogSeedJSON, &c.seed); err != nil {
@@ -171,9 +190,9 @@ func (c *catalog) load() {
 		}
 	}
 	readJSONFile(filepath.Join(c.dir, "shown.json"), &c.shown)
-	var meta struct{ LastRefresh time.Time }
+	var meta struct{ LastRefresh, LastSources time.Time }
 	if readJSONFile(filepath.Join(c.dir, "state.json"), &meta) {
-		c.lastRefresh = meta.LastRefresh
+		c.lastRefresh, c.lastSources = meta.LastRefresh, meta.LastSources
 	}
 	c.loadCorrectionsLocked(true)
 }
@@ -316,6 +335,9 @@ func (c *catalog) tagsFor(m *catalogMovie) []string {
 				t = "Animation (Kids)"
 			}
 		}
+		add(t)
+	}
+	for _, t := range sourceTags(m) {
 		add(t)
 	}
 	for _, h := range c.seed.Holidays {
@@ -507,7 +529,8 @@ func (c *catalog) lineupsLocked() {
 		shown := c.shown[id]
 		score := map[int]float64{}
 		for _, m := range list {
-			s := m.Rating / 10 * math.Log10(float64(m.Votes)+10)
+			r, v := m.bestRating()
+			s := r / 10 * math.Log10(float64(v)+10)
 			if id == "new" {
 				s = math.Log10(m.Popularity + 1)
 			} else if m.Released >= newSince {
@@ -577,11 +600,16 @@ func (c *catalog) keepFresh() {
 	for {
 		now := c.now()
 		c.mu.Lock()
-		last := c.lastRefresh
+		last, sources := c.lastRefresh, c.lastSources
 		c.mu.Unlock()
-		due := last.IsZero() || (now.Format("2006-01-02") != last.Format("2006-01-02") && now.Hour() >= catalogRefreshHour)
-		if due {
+		dueAt := func(t time.Time) bool {
+			return t.IsZero() || (now.Format("2006-01-02") != t.Format("2006-01-02") && now.Hour() >= catalogRefreshHour)
+		}
+		if dueAt(last) {
 			c.refreshNow()
+		}
+		if dueAt(sources) {
+			c.refreshSources()
 		}
 		time.Sleep(15 * time.Minute)
 	}
@@ -709,7 +737,14 @@ func (c *catalog) markRefreshed(t time.Time) {
 	c.mu.Lock()
 	c.lastRefresh = t
 	c.mu.Unlock()
-	if err := writeJSONFile(filepath.Join(c.dir, "state.json"), map[string]time.Time{"LastRefresh": t}); err != nil {
+	c.writeState()
+}
+
+func (c *catalog) writeState() {
+	c.mu.Lock()
+	state := map[string]time.Time{"LastRefresh": c.lastRefresh, "LastSources": c.lastSources}
+	c.mu.Unlock()
+	if err := writeJSONFile(filepath.Join(c.dir, "state.json"), state); err != nil {
 		hubLog.event("catalog_save_failed", "file", "state.json", "error", err)
 	}
 }
@@ -828,10 +863,13 @@ func (c *catalog) serveRows(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	type movieOut struct {
-		ID    int      `json:"id"`
-		Title string   `json:"title"`
-		Year  int      `json:"year"`
-		Tags  []string `json:"tags"`
+		ID         int      `json:"id"`
+		Title      string   `json:"title"`
+		Year       int      `json:"year"`
+		Tags       []string `json:"tags"`
+		IMDbRating float64  `json:"imdbRating,omitempty"`
+		OscarWins  int      `json:"oscarWins,omitempty"`
+		Series     string   `json:"series,omitempty"`
 	}
 	type rowOut struct {
 		ID     string     `json:"id"`
@@ -840,18 +878,19 @@ func (c *catalog) serveRows(w http.ResponseWriter, r *http.Request) {
 		Movies []movieOut `json:"movies"`
 	}
 	c.mu.Lock()
-	total, last := len(c.movies), c.lastRefresh
+	total, last, sources := len(c.movies), c.lastRefresh, c.lastSources
 	c.mu.Unlock()
 	out := struct {
 		On          bool      `json:"on"`
 		Movies      int       `json:"movies"`
 		LastRefresh time.Time `json:"lastRefresh"`
+		LastSources time.Time `json:"lastSources"`
 		Rows        []rowOut  `json:"rows"`
-	}{On: c.on(), Movies: total, LastRefresh: last}
+	}{On: c.on(), Movies: total, LastRefresh: last, LastSources: sources}
 	for _, row := range c.rows() {
 		ro := rowOut{ID: row.ID, Name: row.Name, Count: len(row.Movies)}
 		for _, m := range row.Movies[:min(len(row.Movies), catalogFirstScreen)] {
-			ro.Movies = append(ro.Movies, movieOut{m.ID, m.Title, m.Year(), m.Tags})
+			ro.Movies = append(ro.Movies, movieOut{m.ID, m.Title, m.Year(), m.Tags, m.IMDbRating, m.OscarWins, m.Series})
 		}
 		out.Rows = append(out.Rows, ro)
 	}

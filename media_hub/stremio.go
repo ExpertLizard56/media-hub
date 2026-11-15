@@ -112,10 +112,20 @@ func stremioMeta(m *catalogMovie, full bool) map[string]any {
 	if y := m.Year(); y > 0 {
 		out["releaseInfo"] = strconv.Itoa(y)
 	}
-	if m.Rating > 0 {
-		out["imdbRating"] = strconv.FormatFloat(m.Rating, 'f', 1, 64)
+	if m.IMDbRating > 0 {
+		out["imdbRating"] = strconv.FormatFloat(m.IMDbRating, 'f', 1, 64)
+	} else if m.Rating > 0 {
+		out["imdbRating"] = strconv.FormatFloat(m.Rating, 'f', 1, 64) // TMDB's, until IMDb's is known
 	}
 	if full {
+		switch {
+		case m.OscarWins == 1:
+			out["awards"] = "Won an Academy Award"
+		case m.OscarWins > 1:
+			out["awards"] = "Won " + strconv.Itoa(m.OscarWins) + " Academy Awards"
+		case m.OscarNoms > 0:
+			out["awards"] = "Academy Award nominee"
+		}
 		if m.Runtime > 0 {
 			out["runtime"] = strconv.Itoa(m.Runtime) + " min"
 		}
