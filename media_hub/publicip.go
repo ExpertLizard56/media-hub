@@ -4,7 +4,7 @@ package main
 // router's dynamic DNS keeping that name pointed at the address, so a change only matters if
 // the name fails to follow it. The hub checks every quarter of an hour, logs it, and notifies
 // when it changes: a notification in Home Assistant itself always, and the phones unless they
-// are quiet (the phones option and /share/phone-quiet-until.txt, below).
+// are quiet (/share/phone-quiet-until.txt, below).
 
 import (
 	"bytes"
@@ -32,7 +32,7 @@ var (
 // Services that answer with the address a request came from; no account needed.
 var addressServices = []string{"https://api.ipify.org", "https://icanhazip.com"}
 
-func watchPublicAddress(phones string) {
+func watchPublicAddress() {
 	last := ""
 	if data, err := os.ReadFile(publicAddressFile); err == nil {
 		last = strings.TrimSpace(string(data))
@@ -42,8 +42,7 @@ func watchPublicAddress(phones string) {
 			hubLog.event("public_address", "address", address, "was", last)
 			if last != "" {
 				notifyPhone("Home internet address changed",
-					fmt.Sprintf("It's now %s (was %s). The router's dynamic DNS should point the hub's name at it within 5 minutes; if devices away from home can't connect after that, check the router's dynamic DNS.", address, last),
-					phones)
+					fmt.Sprintf("It's now %s (was %s). The router's dynamic DNS should point the hub's name at it within 5 minutes; if devices away from home can't connect after that, check the router's dynamic DNS.", address, last))
 			}
 			if err := os.WriteFile(publicAddressFile, []byte(address+"\n"), 0o644); err != nil {
 				hubLog.event("public_address_save_failed", "error", err)
@@ -69,11 +68,10 @@ func lookUpPublicAddress() string {
 	return ""
 }
 
-// notifyPhone leaves a notification in Home Assistant itself, then sends it to the phones: the
-// add-on's phones option if it names any (notify services, comma-separated), otherwise every notify
-// service whose name starts with mobile_app_. Phones are skipped while phoneQuietFile says it's
+// notifyPhone leaves a notification in Home Assistant itself, then sends it to the phones: every
+// notify service whose name starts with mobile_app_. Phones are skipped while phoneQuietFile says it's
 // quiet. A failure is logged, never fatal. Needs homeassistant_api in config.yaml.
-func notifyPhone(title, message, phones string) {
+func notifyPhone(title, message string) {
 	token := os.Getenv("SUPERVISOR_TOKEN")
 	if token == "" {
 		hubLog.event("notify_failed", "error", "no Home Assistant access")
@@ -107,7 +105,7 @@ func notifyPhone(title, message, phones string) {
 		hubLog.event("notify_quiet", "title", title, "until", until.Format(time.RFC3339))
 		return
 	}
-	services, err := phoneNotifyServices(phones, call)
+	services, err := phoneNotifyServices(call)
 	if err != nil {
 		hubLog.event("notify_failed", "error", err) // no services to notify this time
 		return
@@ -143,20 +141,10 @@ func phonesQuiet(now time.Time) (time.Time, bool) {
 	return until, true
 }
 
-// phoneNotifyServices is where phone notices go: the phones option's service names, or, when it is
-// blank, every notify service whose name starts with mobile_app_ that Home Assistant lists.
-func phoneNotifyServices(phones string, call func(method, path string, body any) ([]byte, error)) ([]string, error) {
+// phoneNotifyServices is where phone notices go: every notify service whose name starts with
+// mobile_app_ that Home Assistant lists.
+func phoneNotifyServices(call func(method, path string, body any) ([]byte, error)) ([]string, error) {
 	var services []string
-	for _, name := range strings.Split(phones, ",") {
-		name = strings.TrimSpace(name)
-		name = strings.TrimPrefix(name, "notify.")
-		if name = strings.TrimSpace(name); name != "" {
-			services = append(services, name)
-		}
-	}
-	if len(services) > 0 {
-		return services, nil
-	}
 	data, err := call(http.MethodGet, "/services", nil)
 	if err != nil {
 		return nil, err

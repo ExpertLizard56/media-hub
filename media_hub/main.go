@@ -80,7 +80,7 @@ func main() {
 	go ant.monitor()
 
 	go pruneDaily()
-	go watchPublicAddress(opts.Phones)
+	go watchPublicAddress()
 	go logMemoryForever()
 
 	secrets, err := loadAccess()
@@ -314,7 +314,6 @@ type options struct {
 	RemoteAddress string `json:"remote_address"`
 	// Where phone notices go (publicip.go): notify service names, comma-separated. Empty means every
 	// notify service whose name starts with mobile_app_.
-	Phones string `json:"phones"`
 	// An HTTPS listener beside port 8765 (https.go), with the certificate of /ssl/<HTTPSDomain>: both
 	// must be set, and port 0 means off.
 	HTTPSPort   int    `json:"https_port"`

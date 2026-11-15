@@ -1,5 +1,5 @@
 name: Media Hub
-version: "0.22.1"
+version: "0.22.2"
 slug: media_hub
 url: https://github.com/ExpertLizard56/media-hub
 description: Updates and logs for the TV and Music apps, antenna channels, and a music library.
@@ -32,10 +32,9 @@ homeassistant_api: true
 # torbox_api_key: TorBox, Settings, API (downloads new music; musicfetch.go). Only for getting albums.
 # nzbgeek_api_key: NZBgeek, your profile, API key (searches Usenet for albums to get).
 # remote_address: the hub's address from the internet (name:port); apps learn it as they pair. Empty: home only.
-# phones: where phone notices go (publicip.go): notify service names, comma-separated, such as
-# mobile_app_phone. Empty: every notify service whose name starts with mobile_app_. Phones stay quiet
-# until the time in /share/phone-quiet-until.txt (share above), while Home Assistant's own notice
-# still appears.
+# Phone notices go to every notify service whose name starts with mobile_app_ (publicip.go). Phones
+# stay quiet until the time in /share/phone-quiet-until.txt (share above), while Home Assistant's own
+# notice still appears.
 # https_port: a second port that serves the same hub over HTTPS with a certificate from another
 # add-on (0 = off). https_domain: that certificate's folder in /ssl, as
 # /ssl/<https_domain>/fullchain.pem and privkey.pem, read again when they are renewed. Both must be
@@ -48,7 +47,6 @@ options:
   torbox_api_key: ""
   nzbgeek_api_key: ""
   remote_address: ""
-  phones: ""
   https_port: 0
   https_domain: ""
   tmdb_api_key: ""
@@ -57,7 +55,6 @@ schema:
   torbox_api_key: password?
   nzbgeek_api_key: password?
   remote_address: str?
-  phones: str?
   https_port: int(0,65535)?
   https_domain: str?
   tmdb_api_key: password?

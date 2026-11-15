@@ -34,8 +34,7 @@ Settings are the add-on's options in Home Assistant (Settings, Add-ons, Media Hu
 `/data/options.json`, read at start: restart the add-on after a change): `hdhomerun` (the tuner's
 address on the home network; empty = find it by broadcast), `remote_address` (the hub's address from
 the internet, handed to apps as they pair; empty = the hub is used at home only), `torbox_api_key` and
-`nzbgeek_api_key` (only for getting new music; they never leave the hub), `phones` (where phone
-notices go: notify service names, comma-separated; empty = every `mobile_app_*` service),
+`nzbgeek_api_key` (only for getting new music; they never leave the hub),
 `https_port` and `https_domain` (an optional second port serving the same hub over HTTPS with the
 certificate in `/ssl/<https_domain>/`; both must be set, and 0 = off), `tmdb_api_key` (the movie
 catalog; empty = off). Tests
@@ -109,7 +108,7 @@ name pointed at the home's internet address.
   Antenna streams from home never use the upload.
 - If the home's internet address changes, the router's dynamic DNS follows it, so devices need
   nothing. The hub still checks every 15 min, logs it and notifies: always a notification in Home
-  Assistant itself, and the phones (`phones` option; every `mobile_app_*` service when empty) unless
+  Assistant itself, and every phone (`mobile_app_*` notify services) unless
   `/share/phone-quiet-until.txt` holds a time still to come (`publicip.go`, `public_address` in the
   hub log). The app pins the hub's certificate, not a name or address, so the name can point anywhere
   without a rebuild.

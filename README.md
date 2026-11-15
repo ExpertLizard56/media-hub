@@ -59,7 +59,6 @@ add-on starts, so restart it after a change.
 | --- | --- |
 | `hdhomerun` | The HDHomeRun's address on your network (an IP or a name). Empty finds it automatically with SiliconDust's discovery broadcast, which is what most people want. |
 | `remote_address` | The address apps should use when they're away from home, as `name:port` (the name your router's dynamic DNS keeps pointed at your internet address, with the port you forward to the hub). Empty means the hub is used at home only. |
-| `phones` | Where phone notices go (for example when your home's internet address changes): notify service names, comma-separated, such as `mobile_app_phone`. Empty notifies every phone the Home Assistant app has added. |
 | `https_port` | Optional. A second port that serves the same hub over HTTPS, for a certificate from a real certificate authority (for a reverse proxy, or a browser that needs a certificate it trusts). `0` turns it off. It needs `https_domain` as well. |
 | `https_domain` | Optional. The folder of the HTTPS certificate in Home Assistant's `/ssl`: the hub uses `/ssl/<https_domain>/fullchain.pem` and `privkey.pem`. Needed with `https_port`. A certificate another add-on renews is used within a minute, without restarting the hub. |
 | `tmdb_api_key` | Optional. A TMDB API key (or read access token) for the movie catalog: rows of movies refreshed daily, which a home-network-only Stremio add-on at `/stremio/manifest.json` shows for testing. Empty turns it off. |
