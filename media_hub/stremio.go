@@ -102,11 +102,7 @@ func (s stremioAddon) meta(w http.ResponseWriter, r *http.Request) {
 }
 
 func stremioMeta(m *catalogMovie, full bool) map[string]any {
-	id := "tmdb:" + strconv.Itoa(m.ID)
-	if m.IMDb != "" {
-		id = m.IMDb
-	}
-	out := map[string]any{"id": id, "type": "movie", "name": m.Title, "description": m.Overview, "genres": m.Tags}
+	out := map[string]any{"id": m.streamID(), "type": "movie", "name": m.Title, "description": m.Overview, "genres": m.Tags}
 	if m.Poster != "" {
 		out["poster"] = "https://image.tmdb.org/t/p/w500" + m.Poster
 	}

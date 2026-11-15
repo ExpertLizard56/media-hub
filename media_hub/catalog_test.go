@@ -7,6 +7,7 @@ import (
 	"os"
 	"path/filepath"
 	"reflect"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -228,5 +229,28 @@ func TestStremioCatalog(t *testing.T) {
 	get("/stremio/meta/movie/tmdb:5.json", &meta)
 	if meta.Meta.ID != "tmdb:5" {
 		t.Fatalf("meta %+v", meta)
+	}
+}
+
+func TestNoStreamsLeftOut(t *testing.T) {
+	c := testCatalog(t, time.Date(2026, 3, 3, 9, 0, 0, 0, time.Local))
+	c.seed = catalogSeed{Tags: map[string][]string{}}
+	for i := 1; i <= 12; i++ {
+		c.movies[i] = &catalogMovie{ID: i, IMDb: "tt" + strconv.Itoa(i), Released: "2000-01-01", GenreIDs: []int{37}}
+	}
+	c.movies[12].IMDb = ""
+	// 1: none found (left out); 2: an error (stays); 3: not checked yet (stays); 12: tmdb id, none found.
+	file := "\xef\xbb\xbf" + `[{"id":"tt1","streams":0,"error":null,"checked":"x"},{"id":"tt2","streams":0,"error":"timeout","checked":"x"},
+		{"id":"tt3"},{"id":"tt4","streams":5,"error":null,"checked":"x"},{"id":"tmdb:12","streams":0,"checked":"x"}]`
+	if err := os.WriteFile(filepath.Join(c.dir, "streams.json"), []byte(file), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	west, _ := c.row("tag-western")
+	got := map[int]bool{}
+	for _, m := range west.Movies {
+		got[m.ID] = true
+	}
+	if len(west.Movies) != 10 || got[1] || got[12] || !got[2] || !got[3] {
+		t.Fatalf("western: %d movies %v", len(west.Movies), got)
 	}
 }

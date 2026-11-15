@@ -14,9 +14,14 @@ package main
 // - The day's lineup of each row: better-rated and new movies first, a little shuffled each day,
 //   movies that were on a row's first screen in the last week pushed down; same order all day.
 // - Files in /share/media-hub/catalog/: movies.json (everything known), shown.json (what each row
-//   showed first, by day), corrections.json (yours).
+//   showed first, by day), corrections.json (yours), streams.json (below).
+// - streams.json: the PC's stream check (Playback report's "Check catalog streams.ps1", a JSON array of
+//   {"id": "tt.../tmdb:<id>", "streams": n, "error": ..., "checked": ...}). A movie it checked that came
+//   back with no streams and no error is left out of every row until a later check finds some. Movies
+//   not in it, or with an error, stay. Read again when it changes, like corrections.json.
 
 import (
+	"bytes"
 	_ "embed"
 	"encoding/json"
 	"fmt"
@@ -84,6 +89,14 @@ type catalogMovie struct {
 	Tags []string `json:"-"`
 }
 
+// streamID: the id players look streams up by, the IMDb id if there is one, else tmdb:<id>.
+func (m *catalogMovie) streamID() string {
+	if m.IMDb != "" {
+		return m.IMDb
+	}
+	return "tmdb:" + strconv.Itoa(m.ID)
+}
+
 func (m *catalogMovie) Year() int {
 	if len(m.Released) >= 4 {
 		y, _ := strconv.Atoi(m.Released[:4])
@@ -126,6 +139,9 @@ type catalog struct {
 	corrections map[int][]string
 	corrMod     time.Time
 	corrChecked time.Time
+	noStreams   map[string]bool // stremio ids (tt... or tmdb:<id>) the stream check found nothing for
+	nsMod       time.Time
+	nsChecked   time.Time
 	shown       map[string]map[int]string // row id -> movie id -> last day on the row's first screen
 	lineupDay   string
 	lineups     map[string][]int // row id -> the day's order
@@ -167,6 +183,7 @@ func readJSONFile(path string, v any) bool {
 	if err != nil {
 		return false
 	}
+	data = bytes.TrimPrefix(data, []byte("\xef\xbb\xbf")) // Windows PowerShell writes a BOM
 	if err := json.Unmarshal(data, v); err != nil {
 		hubLog.event("catalog_file_bad", "file", filepath.Base(path), "error", err)
 		return false
@@ -221,6 +238,44 @@ func (c *catalog) loadCorrectionsLocked(force bool) {
 	}
 	c.corrections, c.lineupDay = corr, "" // the lineups are worked out again with them
 	hubLog.event("catalog_corrections", "movies", len(corr))
+}
+
+// loadNoStreamsLocked reads streams.json again if it changed (looked at once a minute at most).
+func (c *catalog) loadNoStreamsLocked(force bool) {
+	now := c.now()
+	if !force && now.Sub(c.nsChecked) < time.Minute {
+		return
+	}
+	c.nsChecked = now
+	path := filepath.Join(c.dir, "streams.json")
+	st, err := os.Stat(path)
+	if err != nil {
+		if len(c.noStreams) > 0 {
+			c.noStreams, c.lineupDay = nil, ""
+		}
+		return
+	}
+	if !force && st.ModTime().Equal(c.nsMod) {
+		return
+	}
+	c.nsMod = st.ModTime()
+	var raw []struct {
+		ID      string  `json:"id"`
+		Streams *int    `json:"streams"`
+		Error   *string `json:"error"`
+		Checked string  `json:"checked"`
+	}
+	if !readJSONFile(path, &raw) {
+		return
+	}
+	none := map[string]bool{}
+	for _, e := range raw {
+		if e.Checked != "" && e.Streams != nil && *e.Streams == 0 && (e.Error == nil || *e.Error == "") {
+			none[e.ID] = true
+		}
+	}
+	c.noStreams, c.lineupDay = none, ""
+	hubLog.event("catalog_no_streams", "movies", len(none), "checked", len(raw))
 }
 
 // tagsFor: the corrections if the movie has any; otherwise the hand sorting's tags plus the tags of
@@ -420,6 +475,7 @@ func (c *catalog) moviesLocked(ids []int) []*catalogMovie {
 // lineupsLocked works out the day's order of every row once a day (or after corrections or a refresh).
 func (c *catalog) lineupsLocked() {
 	c.loadCorrectionsLocked(false)
+	c.loadNoStreamsLocked(false)
 	now := c.now()
 	day := now.Format("2006-01-02")
 	if c.lineupDay == day && c.lineups != nil {
@@ -431,6 +487,9 @@ func (c *catalog) lineupsLocked() {
 	for _, m := range c.movies {
 		if m.Released == "" || m.Released > day {
 			continue // not out yet
+		}
+		if c.noStreams[m.streamID()] {
+			continue // nothing to play
 		}
 		tags := c.tagsFor(m)
 		for _, t := range tags {
