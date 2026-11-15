@@ -68,10 +68,23 @@ func lookUpPublicAddress() string {
 	return ""
 }
 
-// notifyPhone leaves a notification in Home Assistant itself, then sends it to the phones: every
-// notify service whose name starts with mobile_app_. Phones are skipped while phoneQuietFile says it's
-// quiet. A failure is logged, never fatal. Needs homeassistant_api in config.yaml.
+// notifyPhone sends a notice to the phones. With NTFY_URL set (an ntfy topic, outside Home
+// Assistant) it goes there. Otherwise it's left in Home Assistant itself, then sent to every notify
+// service whose name starts with mobile_app_ (needs homeassistant_api in config.yaml). Phones are
+// skipped while phoneQuietFile says it's quiet. A failure is logged, never fatal.
 func notifyPhone(title, message string) {
+	if topic := strings.TrimSpace(os.Getenv("NTFY_URL")); topic != "" {
+		if until, quiet := phonesQuiet(time.Now()); quiet {
+			hubLog.event("notify_quiet", "title", title, "until", until.Format(time.RFC3339))
+			return
+		}
+		if err := notifyNtfy(http.DefaultClient, topic, title, message); err != nil {
+			hubLog.event("notify_failed", "error", err)
+			return
+		}
+		hubLog.event("notified", "title", title, "via", "ntfy")
+		return
+	}
 	token := os.Getenv("SUPERVISOR_TOKEN")
 	if token == "" {
 		hubLog.event("notify_failed", "error", "no Home Assistant access")
@@ -125,6 +138,24 @@ func notifyPhone(title, message string) {
 		}
 	}
 	hubLog.event("notified", "title", title, "phones", sent)
+}
+
+// notifyNtfy posts one notice to an ntfy topic URL: the message as the body, the title as a header.
+func notifyNtfy(client *http.Client, topic, title, message string) error {
+	req, err := http.NewRequest(http.MethodPost, topic, strings.NewReader(message))
+	if err != nil {
+		return err
+	}
+	req.Header.Set("Title", title)
+	resp, err := client.Do(req)
+	if err != nil {
+		return err
+	}
+	defer closeQuietly(resp.Body) // nothing in it is needed
+	if resp.StatusCode >= 300 {
+		return fmt.Errorf("ntfy: %s", resp.Status)
+	}
+	return nil
 }
 
 // phonesQuiet reports the time phones stay quiet until, read from phoneQuietFile: one ISO time with

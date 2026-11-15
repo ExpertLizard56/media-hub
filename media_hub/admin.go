@@ -77,15 +77,27 @@ func (a *adminPage) routes(mux *http.ServeMux) {
 	mux.Handle("POST /admin/new-code", a.only(a.newCode))
 }
 
-// only lets Home Assistant's proxy in, and nobody else (not the home network, not the internet).
+// only lets Home Assistant's proxy in, or a login proxy on this same machine (a request from the
+// machine itself that carries the signed-in user in X-Remote-User-Id), and nobody else (not the home
+// network, not the internet).
 func (a *adminPage) only(next http.HandlerFunc) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if remoteHost(r) != ingressProxy {
+		if !adminAllowed(r) {
 			http.NotFound(w, r)
 			return
 		}
 		next(w, r)
 	})
+}
+
+// adminAllowed: Home Assistant's ingress proxy, or a same-machine proxy that names the signed-in user.
+func adminAllowed(r *http.Request) bool {
+	host := remoteHost(r)
+	if host == ingressProxy {
+		return true
+	}
+	ip := net.ParseIP(host)
+	return ip != nil && ip.IsLoopback() && strings.TrimSpace(r.Header.Get("X-Remote-User-Id")) != ""
 }
 
 type deviceRow struct {
