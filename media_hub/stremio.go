@@ -7,6 +7,11 @@ package main
 //
 // Movies with an IMDb id are sent as tt ids, so Stremio's own add-ons find their streams; the rest as
 // tmdb:<id>, whose details come from meta below.
+//
+// Each catalog and meta request is logged (stremio_catalog ip= row= skip=, stremio_meta ip= id=) in the
+// hub log, /share/media-hub/diagnostics/hub/<day>.log, so Playback report can match a box's play to
+// the row it was opened from. Meta is declared only for tmdb:, so tt movies' details come from
+// Cinemeta and opening one isn't logged here.
 
 import (
 	"encoding/json"
@@ -72,6 +77,7 @@ func (s stremioAddon) catalogRow(w http.ResponseWriter, r *http.Request) {
 			skip, _ = strconv.Atoi(v)
 		}
 	}
+	hubLog.event("stremio_catalog", "ip", remoteHost(r), "row", id, "skip", skip)
 	metas := []map[string]any{}
 	if row, ok := s.cat.row(id); ok && skip >= 0 && skip < len(row.Movies) {
 		for _, m := range row.Movies[skip:min(len(row.Movies), skip+stremioPage)] {
@@ -86,6 +92,7 @@ func (s stremioAddon) meta(w http.ResponseWriter, r *http.Request) {
 	rest := strings.TrimSuffix(r.PathValue("rest"), ".json")
 	id, err := strconv.Atoi(strings.TrimPrefix(rest, "tmdb:"))
 	m, ok := s.cat.movie(id)
+	hubLog.event("stremio_meta", "ip", remoteHost(r), "id", rest)
 	if err != nil || !strings.HasPrefix(rest, "tmdb:") || !ok {
 		w.Header().Set("Access-Control-Allow-Origin", "*")
 		http.NotFound(w, r)
