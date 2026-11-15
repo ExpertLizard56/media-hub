@@ -51,6 +51,7 @@ func TestSourcesIMDbAndWikidata(t *testing.T) {
 		3: {ID: 3, IMDb: "tt0000003", Title: "Three", Released: "2001-01-01"},
 		4: {ID: 4, IMDb: "bad id", Title: "Four", Released: "2001-01-01"},
 		5: {ID: 5, Title: "No IMDb", Released: "2001-01-01"},
+		6: {ID: 6, IMDb: "tt0000006", Title: "Unknown to Wikidata", Released: "2001-01-01"},
 	}
 	c.refreshSources()
 
@@ -72,6 +73,9 @@ func TestSourcesIMDbAndWikidata(t *testing.T) {
 	three, _ := c.movie(3)
 	if three.Wikidata != "Q9" || three.WikidataChecked.IsZero() || len(sourceTags(three)) != 0 {
 		t.Errorf("movie 3: %+v", three)
+	}
+	if six, _ := c.movie(6); six.Wikidata != "" || six.WikidataChecked.IsZero() {
+		t.Errorf("movie 6 (not on Wikidata): %+v", six)
 	}
 	if four, _ := c.movie(4); !four.WikidataChecked.IsZero() {
 		t.Errorf("a bad IMDb id must not be asked about")

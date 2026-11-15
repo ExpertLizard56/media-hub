@@ -185,6 +185,8 @@ func (c *catalog) refreshWikidata(start time.Time) (int, int, error) {
 			f, ok := facts[id]
 			if ok {
 				found++
+			} else {
+				f = &wikidataFacts{} // Wikidata doesn't know it: nothing to add, asked again later
 			}
 			for _, m := range byIMDb[id] {
 				m.Wikidata, m.OscarWins, m.OscarNoms = f.item, len(f.wins), len(f.noms)
