@@ -224,6 +224,25 @@ shared by every device on the same channel, nothing transcoded) and `/antenna/st
 HDHomeRun is found by broadcast (`discover.go`) unless the `hdhomerun` option names it; `monitor.go`
 and `tsstats.go` log its signal and lost packets (Diagnostics, above). The app's side is `tv/tv.md`.
 
+## The stream system: four cogs
+
+Getting a movie from "it's in a row" to "it plays" is split into four cogs. Each one does one job, talks
+to the others only through its published interface (HTTP/JSON, or files in the catalog folder), and can
+be replaced without touching the other three. Build every change to fit one cog; if it needs two, it's
+two changes.
+
+| Cog | Job | Today | Later | Interface |
+|---|---|---|---|---|
+| 1. Finder | look up every file there is for a title: indexes, size, hash, resolution, where found, cached on TorBox or not. No ranking, no taste filters | Comet, Meteor, MediaFusion, StremThru Torz (public servers, called by AIOStreams) | Camron's own finder, its own add-on and repo, replacing all four | Stremio stream protocol: `/stream/movie/<id>.json`, every candidate with its facts |
+| 2. Sorter | take the finders' candidates, drop duplicates and unwanted ones, rank what's left, hand Stremio / the TV app the list | AIOStreams (Pi add-on, local_aiostreams) | own sorter ranking by what actually works on these boxes; may live in the hub, but as its own file with one entry point (candidates + record in, ordered list out) | Stremio stream protocol out; reads records from cog 3 |
+| 3. Record keeper | keep everything known about each title in one record; the only place it's stored | the hub: `catalog.go`, `catalogsources.go`, `catalogrecord.go` | same, growing new sections | `/catalog/movie/<id>`, `/catalog/movies[?since=]`; files in /share/media-hub/catalog/ |
+| 4. Feedback | watch what really happens and report it: plays, link tests, stream checks | PC scripts in Home Network\Services\Playback report (Playback report, Test links, Check catalog streams, Copy to Pi) | same, plus whatever the boxes report themselves | writes plays.jsonl, links.jsonl, streams.json into the catalog folder; reads cog 3 |
+
+Rules: the finder never ranks and the sorter never searches; nothing but the record keeper stores
+facts about a title (the others read them from it); feedback reports and never changes rankings
+itself; record fields are only added, never renamed or removed, so every cog keeps working while
+another changes.
+
 ## The movie catalog
 
 `catalog.go`, on when `tmdb_api_key` is set. Once a day (on the first start, then after 4am) it pulls

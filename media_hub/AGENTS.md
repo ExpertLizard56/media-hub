@@ -20,6 +20,8 @@ Things a newcomer trips on:
   supervisor API if a test needs them, without echoing them.
 - Write Go tests as files (heredocs mangle backslashes) and keep files' line endings as they are.
 - Deploy only when asked: a deploy restarts the add-on for everyone using it.
+- Streams are four separate cogs (finder, sorter, record keeper, feedback; hub.md "The stream system:
+  four cogs"). Fit every change to one cog and keep them talking only through their interfaces.
 
 ## Phone notices (`publicip.go`)
 
