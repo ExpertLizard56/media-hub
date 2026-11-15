@@ -29,6 +29,7 @@ Contents: [Files and settings](#files-and-settings) · [Updates](#updates) · [D
 | `antenna.go`, `discover.go`, `monitor.go`, `tsstats.go` | the antenna relay (the TV app's) |
 | `catalog.go`, `catalogdata/seed.json` | the movie catalog (rows from TMDB, daily lineup); `/catalog/rows` (home only) shows today's rows |
 | `catalogsources.go` | the catalog's facts from outside TMDB: IMDb ratings (daily data file) and Wikidata (Oscars, based on a book or a true story, film series) |
+| `catalogrecord.go` | one record per catalog movie with everything known about it (catalog, IMDb, Wikidata, stream check, the PC's plays and link tests), for other processes: `/catalog/movie/<id>`, `/catalog/movies` (home only) |
 | `stremio.go` | a home-only Stremio add-on over the catalog, for testing it (`/stremio/manifest.json`) |
 
 Settings are the add-on's options in Home Assistant (Settings, Add-ons, Media Hub, Configuration;
@@ -236,6 +237,6 @@ whose dates hold today (the shortest when two do), New Releases, then every tag 
 After the refresh, `catalogsources.go` reads IMDb's daily ratings file (the rating rows sort by when it
 has more votes than TMDB's, and the one Stremio shows) and asks Wikidata about each movie every 30 days,
 150 a query: Oscar wins and nominations, based on a book, based on actual events, film series. Those give
-the tags Oscar Winners, Based on a Book and Based on a True Story. No keys needed. Each row's order is fixed for the day. The TV app will read the rows later; until then `stremio.go`
+the tags Oscar Winners, Based on a Book and Based on a True Story. No keys needed. `catalogrecord.go` puts everything known about each movie into one record for other processes (AI tagging, a stream sorter): the catalog's own data, the stream check (streams.json) and the PC's Playback report plays and link tests (plays.jsonl, links.jsonl, copied into the catalog folder by "Copy to Pi.ps1"), at `/catalog/movie/<tmdb or tt id>` and `/catalog/movies`, home only. Each row's order is fixed for the day. The TV app will read the rows later; until then `stremio.go`
 serves them to Stremio on the home network only (guard turns away everything else without a hub key),
 at `https://<https_domain>:<https_port>/stremio/manifest.json`. It is never published.

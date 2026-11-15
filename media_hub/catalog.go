@@ -21,6 +21,8 @@ package main
 //   not in it, or with an error, stay. Read again when it changes, like corrections.json.
 // - IMDb ratings and Wikidata facts (Oscars, based on a book or a true story, film series) come from
 //   catalogsources.go, once a day after the refresh.
+// - plays.jsonl and links.jsonl (the PC's Playback report plays and link tests, copied there) and all
+//   of the above come together per movie in catalogrecord.go (/catalog/movie/<id>, /catalog/movies).
 
 import (
 	"bytes"
@@ -163,6 +165,8 @@ type catalog struct {
 	lineups     map[string][]int // row id -> the day's order
 	lastRefresh time.Time
 	lastSources time.Time
+
+	recStreams, recPlays, recLinks keyedFile // catalogrecord.go
 }
 
 func newCatalog(key, dir string) *catalog {
@@ -854,6 +858,8 @@ func (d tmdbDetails) applyTo(m *catalogMovie) {
 
 func (c *catalog) routes(mux *http.ServeMux) {
 	mux.HandleFunc("GET /catalog/rows", c.serveRows)
+	mux.HandleFunc("GET /catalog/movie/{id}", c.serveMovieRecord)
+	mux.HandleFunc("GET /catalog/movies", c.serveMovieRecords)
 }
 
 // serveRows: today's rows with their first 20 movies, for checking the catalog from the home network.
