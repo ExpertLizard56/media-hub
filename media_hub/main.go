@@ -103,6 +103,10 @@ func main() {
 	cat := newCatalog(opts.TMDBKey, catalogDir)
 	cat.routes(mux)
 	stremioAddon{cat}.routes(mux)
+	// The file track record (catalogfiles.go): works without a TMDB key; the Sorter reads its files.json.
+	files := newFileTrack(catalogDir)
+	files.routes(mux)
+	go files.keepWritten()
 	if cat.on() {
 		go cat.keepFresh()
 	}
