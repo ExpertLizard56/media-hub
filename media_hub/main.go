@@ -107,6 +107,10 @@ func main() {
 	files := newFileTrack(catalogDir)
 	files.routes(mux)
 	go files.keepWritten()
+	// Device finds (catalogdevices.go): what each box and TV can play; the Sorter reads devices.json.
+	devices := newDeviceTrack(catalogDir)
+	devices.routes(mux)
+	go devices.keepWritten()
 	if cat.on() {
 		go cat.keepFresh()
 	}

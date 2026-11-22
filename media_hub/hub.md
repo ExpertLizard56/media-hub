@@ -31,6 +31,7 @@ Contents: [Files and settings](#files-and-settings) · [Updates](#updates) · [D
 | `catalogsources.go` | the catalog's facts from outside TMDB: IMDb ratings (daily data file) and Wikidata (Oscars, based on a book or a true story, film series) |
 | `catalogrecord.go` | one record per catalog movie with everything known about it (catalog, IMDb, Wikidata, stream check, the PC's plays and link tests), for other processes: `/catalog/movie/<id>`, `/catalog/movies` (home only) |
 | `catalogfiles.go` | the file track record: per stream file (movies and episodes), its plays, stalls, failures, link tests and Sorter links with a verdict (proven, failed, stalls, untested), for the Sorter: files.json in the catalog folder, `/catalog/files[?verdict=]`, `/catalog/file/<hash or fp>` (home only) |
+| `catalogdevices.go` | device finds: what each box and its TV can play, from the PC's device-facts.json ("Device facts.ps1" over adb: hardware decoders, TV HDR from EDID, settings, IP) joined with each box's plays and sound log; devices.json in the catalog folder, `/catalog/devices`, `/catalog/device/<box or ip>` (home only) |
 | `stremio.go` | a home-only Stremio add-on over the catalog, for testing it (`/stremio/manifest.json`) |
 
 Settings are the add-on's options in Home Assistant (Settings, Add-ons, Media Hub, Configuration;
@@ -236,7 +237,7 @@ two changes.
 |---|---|---|---|---|
 | 1. Finder | look up every file there is for a title: indexes, size, hash, resolution, where found, cached on TorBox or not. No ranking, no taste filters | Comet, Meteor, MediaFusion, StremThru Torz (public servers, called by AIOStreams) | Camron's own finder, its own add-on and repo, replacing all four | Stremio stream protocol: `/stream/movie/<id>.json`, every candidate with its facts |
 | 2. Sorter | take the finders' candidates, drop duplicates and unwanted ones, rank what's left, hand Stremio / the TV app the list | AIOStreams (Pi add-on, local_aiostreams) | own sorter ranking by what actually works on these boxes; may live in the hub, but as its own file with one entry point (candidates + record in, ordered list out) | Stremio stream protocol out; reads records from cog 3 |
-| 3. Record keeper | keep everything known about each title in one record; the only place it's stored | the hub: `catalog.go`, `catalogsources.go`, `catalogrecord.go`, `catalogfiles.go` | same, growing new sections | `/catalog/movie/<id>`, `/catalog/movies[?since=]`, `/catalog/files`; files in /share/media-hub/catalog/ (files.json for the Sorter) |
+| 3. Record keeper | keep everything known about each title in one record; the only place it's stored | the hub: `catalog.go`, `catalogsources.go`, `catalogrecord.go`, `catalogfiles.go`, `catalogdevices.go` | same, growing new sections | `/catalog/movie/<id>`, `/catalog/movies[?since=]`, `/catalog/files`, `/catalog/devices`; files in /share/media-hub/catalog/ (files.json, devices.json for the Sorter) |
 | 4. Feedback | watch what really happens and report it: plays, link tests, stream checks | PC scripts in Home Network\Services\Playback report (Playback report, Test links, Check catalog streams, Copy to Pi) | same, plus whatever the boxes report themselves | writes plays.jsonl, links.jsonl, streams.json into the catalog folder; reads cog 3 |
 
 Rules: the finder never ranks and the sorter never searches; nothing but the record keeper stores
@@ -245,6 +246,8 @@ itself; record fields are only added, never renamed or removed, so every cog kee
 another changes.
 
 File track record (`catalogfiles.go`): one entry per stream file, movies and episodes alike, from plays.jsonl, links.jsonl, audio.jsonl (the PC's) and sorter-plays.jsonl (the Sorter's own /play results). A file is `<hash>/<file name>` once a Sorter link names it, else `fp:<fingerprint>` (first 12 hex of the SHA-256 of the play link, all older records have); a fingerprint seen next to a hash joins that file. Verdict: failed when the latest outcome (play, link test or Sorter link) failed; stalls when the latest started play had 3+ rebuffers; proven after a started play or two good link tests with the latest outcome good; else untested. Silent plays (sound log all silent) are counted, not judged: a paused or sleeping TV is silent too. Rebuilt when an input changes (checked once a minute) into files.json, which the Sorter reads from the shared folder.
+
+Device finds (`catalogdevices.go`): one entry per box (bedroom, living, firetv). `facts` is the box's entry from device-facts.json, written by the PC's `Home Network\Services\Playback report\Device facts.ps1` (read-only adb; run again after a firmware update). `seen` is what its plays showed: plays, started, failed, stalled, start median, per decoder and engine tallies, display modes, audio formats sent and what reached the TV (minutes). `can_play`: video (hardware decoders), hdr (what the TV shows; boxes send everything as Dolby Vision, hdr_conversion_mode 2), audio (decoded on the box, hardware or Stremio's ffmpeg), audio_to_tv (formats seen passed through undecoded), proven and failed_only decoders. The `ip` lets the Sorter match a client to a box.
 
 ## The movie catalog
 
