@@ -199,9 +199,7 @@ func (f *keyedFile) get(path string, lines bool) map[string][]json.RawMessage {
 		if id == "" {
 			id, _ = k.ID.(string)
 		}
-		if id != "" {
-			byID[id] = append(byID[id], it)
-		}
+		byID[id] = append(byID[id], it) // id-less records under "": title records match some by title
 	}
 	f.path, f.mod, f.size, f.byID = path, st.ModTime(), st.Size(), byID
 	return byID

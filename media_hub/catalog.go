@@ -860,6 +860,7 @@ func (c *catalog) routes(mux *http.ServeMux) {
 	mux.HandleFunc("GET /catalog/rows", c.serveRows)
 	mux.HandleFunc("GET /catalog/movie/{id}", c.serveMovieRecord)
 	mux.HandleFunc("GET /catalog/movies", c.serveMovieRecords)
+	c.titleRoutes(mux) // catalogtitles.go: every watched or link-tested movie and show
 }
 
 // serveRows: today's rows with their first 20 movies, for checking the catalog from the home network.
