@@ -36,6 +36,7 @@ type tally struct {
 }
 
 type deviceSeen struct {
+	Apps         map[string]int    `json:"apps"` // every recorded play by app; the rest counts Stremio's only
 	Plays        int               `json:"plays"`
 	Started      int               `json:"started"`
 	Failed       int               `json:"failed"`
@@ -53,7 +54,8 @@ type deviceCanPlay struct {
 	Video      []string `json:"video"`       // hardware video decoders
 	HDR        []string `json:"hdr"`         // what the TV shows (the Fire TV: its own panel)
 	Audio      []string `json:"audio"`       // decoded on the box (hardware, or Stremio's ffmpeg)
-	AudioToTV  []string `json:"audio_to_tv"` // formats seen going out undecoded (passthrough), else PCM only
+	AudioOut   string   `json:"audio_out,omitempty"` // the box's surround setting (device facts): stereo PCM or bitstream
+	AudioToTV  []string `json:"audio_to_tv"` // formats seen going out undecoded (none when the box is set to stereo PCM)
 	Proven     []string `json:"proven"`      // decoders with at least one started play here
 	FailedOnly []string `json:"failed_only"` // decoders tried here that never started
 }
@@ -140,6 +142,7 @@ type deviceFact struct {
 	AudioHW []string `json:"audio_hw"`
 	AudioSW []string `json:"audio_sw"`
 	TVHDR   []string `json:"tv_hdr"`
+	AudioOut string  `json:"audio_out"`
 }
 
 // Android audio HAL format names -> the short codec names device-facts.json uses.
@@ -156,7 +159,7 @@ func buildDeviceRecords(dir string, now time.Time) *deviceRecords {
 			return d
 		}
 		d := &deviceRecord{Box: box, Seen: &deviceSeen{Decoders: map[string]*tally{}, Engines: map[string]*tally{},
-			Displays: map[string]int{}, AudioFormats: map[string]int{}, AudioToTV: map[string]int{}}}
+			Apps: map[string]int{}, Displays: map[string]int{}, AudioFormats: map[string]int{}, AudioToTV: map[string]int{}}}
 		byBox[box] = d
 		out.Devices = append(out.Devices, d)
 		return d
@@ -181,9 +184,11 @@ func buildDeviceRecords(dir string, now time.Time) *deviceRecords {
 		}
 	}
 
+	seenPlay := map[string]bool{}
 	for _, raw := range readLines(filepath.Join(dir, "plays.jsonl")) {
 		var p struct {
 			Time      string   `json:"time"`
+			App       string   `json:"app"`
 			Box       string   `json:"box"`
 			IP        string   `json:"ip"`
 			Engine    string   `json:"engine"`
@@ -192,6 +197,7 @@ func buildDeviceRecords(dir string, now time.Time) *deviceRecords {
 			StartS    *float64 `json:"start_s"`
 			Rebuffers int      `json:"rebuffers"`
 			Display   string   `json:"display"`
+			PlayTime  string   `json:"play_time"`
 		}
 		if json.Unmarshal(raw, &p) != nil || p.Box == "" || p.Started == nil {
 			continue
@@ -201,6 +207,21 @@ func buildDeviceRecords(dir string, now time.Time) *deviceRecords {
 			d.IP = p.IP
 		}
 		s := d.Seen
+		if p.App != "" {
+			s.Apps[p.App]++
+		}
+		// Other apps' snapshots are often no play at all (the TV asleep, the engine never opened).
+		if p.App != "" && p.App != "com.stremio.one" {
+			continue
+		}
+		// A second snapshot of the same play (same box, day and play_time) counts once.
+		if p.PlayTime != "" {
+			k := d.Box + " " + strings.SplitN(p.Time, "T", 2)[0] + " " + p.PlayTime
+			if seenPlay[k] {
+				continue
+			}
+			seenPlay[k] = true
+		}
 		s.Plays++
 		count := func(m map[string]*tally, k string) {
 			if k = strings.TrimSpace(k); k == "" || k == "never" || k == "none" || k == "unknown" {
@@ -260,8 +281,12 @@ func buildDeviceRecords(dir string, now time.Time) *deviceRecords {
 		f := facts[d.Box]
 		c := &deviceCanPlay{Video: nonNilStrings(f.VideoHW), HDR: nonNilStrings(f.TVHDR), Audio: union(f.AudioHW, f.AudioSW),
 			AudioToTV: []string{}, Proven: []string{}, FailedOnly: []string{}}
+		c.AudioOut = f.AudioOut
 		pass := map[string]bool{}
 		for hal := range d.Seen.AudioFormats {
+			if f.AudioOut == "stereo PCM" {
+				break
+			}
 			if n := halCodec[strings.ToUpper(hal)]; n != "" {
 				pass[n] = true
 			}
